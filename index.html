@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Inferno dos mortos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070a09">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="cv" aria-label="Área de jogo"></canvas>
+
+  <!-- HUD tático -->
+  <div id="hud" hidden>
+    <!-- HUD minimalista: rodada/infectados no topo-esquerdo, vida+energia no canto inferior esquerdo, pontos no topo-direito, munição no inferior direito -->
+    <div class="tl">
+      <div class="glass rodada">
+        <span class="rotulo">RODADA</span>
+        <b id="rodadaNum">1</b>
+        <span class="restam"><span class="rotulo">INFECT.</span> <em id="restam">0</em></span>
+      </div>
+    </div>
+    <div class="bl">
+      <div class="glass vida" id="painelVida">
+        <div class="linha"><span class="rotulo">VIDA</span><span class="num" id="vidaNum">100</span></div>
+        <div class="barra"><i id="vidaBarra"></i></div>
+        <div class="condicao ok" id="condicao">ESTÁVEL</div>
+        <div class="barra est"><i id="stamBarra"></i></div>
+      </div>
+      <div class="glass xp" id="painelXp"><span class="rotulo" id="nivelRun">NV 1</span><div class="barra"><i id="xpBarra"></i></div></div>
+    </div>
+
+    <div class="tr">
+      <div class="trLinha">
+        <button id="btnConfigHud" class="icone" aria-label="Configurações">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="2.4" rx="1.2"/><rect x="4" y="10.8" width="16" height="2.4" rx="1.2"/><rect x="4" y="16.6" width="16" height="2.4" rx="1.2"/><circle cx="9" cy="6.2" r="2.4"/><circle cx="15" cy="12" r="2.4"/><circle cx="8" cy="17.8" r="2.4"/></svg>
+        </button>
+        <button id="btnPausa" class="icone" aria-label="Pausar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+        </button>
+        <div class="glass pontos" id="painelPontos">
+          <span class="rotulo">PONTOS</span>
+          <b id="pontosNum">0</b>
+        </div>
+      </div>
+      <button id="btnLoja" class="btn lojaBtn" hidden>ARMARIA</button>
+      <div id="efeitos"></div>
+    </div>
+
+    <!-- HUD minimalista da arma: ícone + munição em destaque; abaixo, 5 pips de slot e o inventário (granada / molotov / mina) -->
+    <div class="arma mini" id="painelArma">
+      <div class="armaLinha">
+        <svg class="armaIcone" id="armaIcone" viewBox="0 0 64 26" aria-hidden="true"><path id="armaPath" d=""/></svg>
+        <div class="armaNome"><b id="armaNome">M1911</b><small id="armaTipo">PISTOLA</small></div>
+      </div>
+      <div class="municao"><b id="munMag">12</b><span class="barraMun">/</span><span id="munRes">72</span></div>
+      <div class="recarga"><i id="recargaBarra"></i></div>
+      <div class="armaRodape">
+        <div class="slots" id="slots"><span data-i="0">1</span><span data-i="1">2</span><span data-i="2">3</span><span data-i="3">4</span><span data-i="4">5</span><span data-i="5" class="exclusiva">6</span><span data-i="6">7</span></div>
+        <div class="inv">
+          <span class="chip" title="Granadas"><svg viewBox="0 0 64 26" aria-hidden="true"><path d="M29 2h10l-2 5v1.5a8.5 8.5 0 1 1-6 0V7z"/></svg><b id="granNum">2</b></span>
+          <span class="chip" title="Molotovs"><svg viewBox="0 0 64 26" aria-hidden="true"><path d="M29 1h7v5l3 3.5V22a2.5 2.5 0 0 1-2.5 2.5h-8A2.5 2.5 0 0 1 26 22V9.5l3-3.5z"/></svg><b id="molNum">1</b></span>
+          <span class="chip" title="Minas"><svg viewBox="0 0 64 26" aria-hidden="true"><path d="M10 20a22 9 0 0 1 44 0z M30 5h4v6h-4z"/></svg><b id="minaNum">1</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="alertas">
+      <div id="chefe" class="chefe" hidden><span id="chefeNome">TANQUE · BLINDADO</span><div class="barra"><i id="chefeBarra"></i></div></div>
+      <div id="faixa" class="faixa" hidden></div>
+    </div>
+    <div id="aviso" class="aviso" hidden></div>
+    <div id="prompt" class="glass prompt" hidden><span id="promptTxt"></span><i id="promptBarra"></i></div>
+    <div id="banner" class="banner" hidden><b id="bannerTitulo"></b><small id="bannerSub"></small></div>
+    <div id="dica" class="dica" hidden></div>
+    <div id="toastConq" class="toastConq" hidden></div>
+  </div>
+
+  <!-- Controles touch -->
+  <div id="controles" hidden>
+    <div id="miraZona" aria-hidden="true"></div>
+    <div id="stickZona"></div>
+    <div id="stickBase"><i id="stickKnob"></i></div>
+    <div id="acoes">
+      <button id="btnTrocar" class="acao pequeno" aria-label="Trocar de arma">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5" class="fino"/></svg>
+        <span>TROCAR</span>
+      </button>
+      <button id="btnCorrer" class="acao pequeno" aria-label="Correr">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 4l-7 9h5l-1 7 7-9h-5z" class="fino"/></svg>
+        <span>CORRER</span>
+      </button>
+      <button id="btnGranada" class="acao pequeno" aria-label="Arremessar granada">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="6" class="fino"/><path d="M10 6h4M12 6V3l3 1" class="fino"/></svg>
+        <span>GRANADA</span>
+      </button>
+      <button id="btnMolotov" class="acao pequeno item" aria-label="Lançar molotov" data-n="1">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v3l2 2.5V19a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V8.5L10 6z" class="fino"/><path d="M12 11c1.6 1.4 1.6 3.2 0 4.6-1.6-1.4-1.6-3.2 0-4.6z" class="cheio"/></svg>
+        <span>MOLOTOV</span>
+      </button>
+      <button id="btnMina" class="acao pequeno item" aria-label="Plantar mina" data-n="1">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 5 0 0 1 16 0z" class="fino"/><path d="M12 8v4M7 10l2 2M17 10l-2 2" class="fino"/></svg>
+        <span>MINA</span>
+      </button>
+      <button id="btnRecarregar" class="acao pequeno" aria-label="Recarregar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.2-5.1" class="fino"/><path d="M19 4v5h-5" class="fino"/></svg>
+        <span>RECARREGAR</span>
+      </button>
+      <button id="btnAtirar" class="acao grande" aria-label="Atirar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5" class="fino"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" class="fino"/><circle cx="12" cy="12" r="1.4" class="cheio"/></svg>
+        <span>ATIRAR</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Menu inicial -->
+  <section id="menu" class="tela" role="dialog" aria-labelledby="menuTitulo">
+    <div class="cartao menuCartao">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <div class="mCol">
+        <p class="selo">OPERAÇÃO NOITE ETERNA</p>
+        <h1 id="menuTitulo">INFERNO<br>DOS MORTOS</h1>
+        <p class="sub">Setor de combate 07. Zona de quarentena rompida: resista às ondas de infectados até a extração que nunca chega.</p>
+      </div>
+      <div class="mCol">
+      <div class="nivel">
+        <span class="rotulo">NÍVEL DE AMEAÇA</span>
+        <div id="nivelGrupo" class="nivelGrupo" role="radiogroup" aria-label="Nível de ameaça">
+          <button type="button" role="radio" data-dif="facil" aria-checked="false"><b>FÁCIL</b><small>RECRUTA</small></button>
+          <button type="button" role="radio" data-dif="normal" aria-checked="true" class="ativo"><b>NORMAL</b><small>SOLDADO</small></button>
+          <button type="button" role="radio" data-dif="dificil" aria-checked="false"><b>DIFÍCIL</b><small>VETERANO</small></button>
+          <button type="button" role="radio" data-dif="insano" aria-checked="false"><b>INSANO</b><small>LENDA</small></button>
+        </div>
+        <p id="nivelDesc" class="nivelDesc"></p>
+      </div>
+      <div class="skins">
+        <span class="rotulo">SOLDADO</span>
+        <div id="skinGrupo" class="skinGrupo" role="radiogroup" aria-label="Escolha do soldado"></div>
+      </div>
+      <div class="acoesMenu">
+        <button id="btnJogar" class="btn primario">INICIAR OPERAÇÃO</button>
+        <button id="btnHistoria" class="btn destaque">HISTÓRIA</button>
+        <button id="btnLegado" class="btn destaque">LEGADO · CONQUISTAS E ÁRVORE</button>
+        <button id="btnConquistas" class="btn">ARQUIVO DO SOLDADO</button>
+        <button id="btnRecompensas" class="btn">RECOMPENSAS</button>
+        <button id="btnComoJogar" class="btn">BRIEFING</button>
+        <button id="btnTelaMenu" class="btn" hidden>TELA CHEIA</button>
+        <button id="btnConfigMenu" class="btn">CONFIGURAÇÕES</button>
+        <button id="btnCreditos" class="btn">CRÉDITOS</button>
+      </div>
+      </div>
+      <div id="ajuda" class="ajuda" hidden>
+        <ul>
+          <li><b>Analógico esquerdo</b> move o soldado.</li>
+          <li><b>ATIRAR</b>: segure para disparar. A mira trava no infectado mais próximo. Arraste o botão para mirar manualmente.</li>
+          <li><b>RECARREGAR</b> enche o pente. <b>TROCAR</b> alterna entre as armas que você possui. Você começa só com a M1911: compre o resto na <b>ARMARIA</b> (entre rodadas ou no posto verde-ácido do mapa).</li>
+          <li><b>GRANADA</b> é arremessada em arco: explode por tempo ou impacto e solta estilhaços em todas as direções.</li>
+          <li><b>MOLOTOV</b> cria uma zona de fogo e incendeia por 3 s; inimigo em chamas que te toca <b>incendeia você</b>. <b>MINA</b>: plante e afaste-se, só inimigos a detonam. Até 6 de cada.</li>
+          <li><b>BARRIS VERMELHOS</b> explodem com tiros e levam a horda junto. <b>SUPRIMENTOS</b> raros: escudo, balas incendiárias, balas explosivas (super raro).</li>
+          <li class="controleTxt"><b>Controle Xbox</b>: analógico esquerdo move, direito mira, RT ou X atira, LT ou LB granada, D-pad ↑ ou R3 molotov, D-pad ↓ mina, RB ou B recarrega, Y troca de arma, View abre a loja, Menu pausa.</li>
+          <li>Fique sobre os postos brilhantes para requisitar <b>reabastecimento</b> e <b>atendimento médico</b>.</li>
+          <li><b>CORREDOR</b> (anel amarelo): agacha e salta sobre você. Desvie para o lado quando ele se preparar.</li>
+          <li><b>TANQUE</b> (anel laranja): blindado, lento e devastador. Enfurece ao primeiro dano. Sempre deixa suprimentos.</li>
+          <li><b>TÓXICO</b> (anel verde): explode ao chegar perto ou ao morrer e deixa um rastro de ácido no chão; não pise nele. Abata de longe e use a explosão contra a horda.</li>
+          <li class="teclado">Teclado: WASD move, mouse mira e atira, R recarrega, Q ou 1 a 5 troca, G granada, F molotov, C mina, E armaria, Esc pausa.</li>
+        </ul>
+      </div>
+      <p class="slotAtivo" id="slotAtivo" hidden></p>
+      <p class="rodape"><span id="recorde"></span></p>
+    </div>
+  </section>
+
+  <!-- Pausa -->
+  <section id="pausa" class="tela" role="dialog" aria-labelledby="pausaTitulo" hidden>
+    <div class="cartao pequeno">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <h2 id="pausaTitulo">OPERAÇÃO PAUSADA</h2>
+      <div class="colunaBtn">
+        <button id="btnContinuar" class="btn primario" data-voltar>RETOMAR</button>
+        <button id="btnReiniciar" class="btn">REINICIAR OPERAÇÃO</button>
+        <button id="btnSom" class="btn">SOM: LIGADO</button>
+        <button id="btnConfig" class="btn">CONFIGURAÇÕES</button>
+        <button id="btnTela" class="btn" hidden>TELA CHEIA</button>
+        <button id="btnMenu" class="btn">ABORTAR OPERAÇÃO</button>
+      </div>
+      <p class="rodape"><span id="motorPausa"></span></p>
+    </div>
+  </section>
+
+  <!-- Configurações (menu e pausa) -->
+  <section id="config" class="tela configTela" role="dialog" aria-labelledby="configTitulo" hidden>
+    <div class="cartao configCartao">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <h2 id="configTitulo">CONFIGURAÇÕES</h2>
+      <div class="configLinha">
+        <div class="configNome"><b>MIRA AUTOMÁTICA</b><small>Desligada: mire com o mouse, arrastando o botão ATIRAR ou tocando na metade direita da tela.</small></div>
+        <button id="btnAuto" class="btn chave" aria-pressed="true">LIGADA</button>
+      </div>
+      <label class="rangeLinha"><span>TREMOR DA TELA <b id="shakeVal">100%</b></span><input type="range" id="rngShake" min="0" max="150" step="5" value="100"><small>0% = sem tremor · 150% = exagerado (tiros, explosões e dano)</small></label>
+      <div class="configLinha">
+        <div class="configNome"><b>CAMADA NOTURNA</b><small>Tinta azul-noite (multiply) e facho quente da lanterna que segue a mira. Desligue para ganhar FPS.</small></div>
+        <button id="btnNoite" class="btn chave ativo" aria-pressed="true">LIGADA</button>
+      </div>
+      <label class="rangeLinha"><span>ILUMINAÇÃO · RAIO DA LANTERNA <b id="luzVal">70%</b></span><input type="range" id="rngLuz" min="0" max="100" step="1" value="70"><small>0% = escuridão total · 100% = cenário completo</small></label>
+      <div class="rangeLinha"><span>TAMANHO DOS CONTROLES TOUCH</span>
+        <div class="presets"><button id="btnEscP" class="btn mini">PEQUENO</button><button id="btnEscM" class="btn mini">MÉDIO</button><button id="btnEscG" class="btn mini">GRANDE</button></div>
+      </div>
+      <label class="rangeLinha"><span>BOTÕES DE AÇÃO <b id="escVal">100%</b></span><input type="range" id="rngEscala" min="50" max="150" step="5" value="100"></label>
+      <label class="rangeLinha"><span>ANALÓGICO <b id="escStickVal">100%</b></span><input type="range" id="rngEscalaStick" min="50" max="150" step="5" value="100"><small>Os controles mudam de tamanho na hora, atrás deste painel.</small></label>
+      <label class="rangeLinha"><span>ZONA MORTA DO ANALÓGICO <b id="dzVal">18%</b></span><input type="range" id="rngDeadzone" min="5" max="50" step="1" value="18"></label>
+      <div class="configLinha">
+        <div class="configNome"><b>VIBRAÇÃO</b><small id="vibDesc">Vibra o aparelho (e o controle) em dano, explosões e armas pesadas.</small></div>
+        <button id="btnVibrar" class="btn chave ativo" aria-pressed="true">LIGADA</button>
+      </div>
+      <div class="rangeLinha"><span>ZOOM DA CÂMERA <b id="zoomVal">100%</b></span>
+        <div class="zoomLinha"><button id="btnZoomMenos" class="btn mini" aria-label="Diminuir zoom">−</button><input type="range" id="rngZoom" min="60" max="160" step="5" value="100" aria-label="Zoom da câmera"><button id="btnZoomMais" class="btn mini" aria-label="Aumentar zoom">+</button></div>
+        <small>Ajusta em tempo real · menor = vê mais do mapa · maior = mais perto</small></div>
+      <details class="padCfg" id="padCfg">
+        <summary>CONTROLE (GAMEPAD) · MAPEAMENTO</summary>
+        <p class="padStatus" id="padStatus">Nenhum controle detectado. Conecte e aperte qualquer botão.</p>
+        <div class="configLinha"><div class="configNome"><b>PERFIL DE BOTÕES</b><small>AUTO usa o mapeamento reportado pelo aparelho. Se o controle Xbox Bluetooth reagir errado, tente o outro perfil.</small></div>
+          <button id="btnPerfil" class="btn chave ativo">AUTO</button></div>
+        <div id="padLinhas" class="padLinhas"></div>
+        <pre id="padDiag" class="padDiag" aria-live="off"></pre>
+        <button id="btnPadReset" class="btn">RESTAURAR PADRÃO</button>
+      </details>
+      <button id="btnConfigVoltar" class="btn primario" data-voltar>VOLTAR</button>
+    </div>
+  </section>
+
+  <!-- História: novo jogo / carregar -->
+  <section id="historia" class="tela" role="dialog" aria-labelledby="historiaTitulo" hidden>
+    <div class="cartao pequeno">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <p class="selo">CAMPANHA</p>
+      <h2 id="historiaTitulo">HISTÓRIA</h2>
+      <div class="colunaBtn">
+        <button id="btnHNovo" class="btn primario">NOVO JOGO</button>
+        <button id="btnHCarregar" class="btn">CARREGAR JOGO</button>
+        <button id="btnHVoltar" class="btn" data-voltar>VOLTAR</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="telaSlots" class="tela" role="dialog" aria-labelledby="slotsTitulo" hidden>
+    <div class="cartao slotsCartao">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <h2 id="slotsTitulo">NOVO JOGO</h2>
+      <p class="nivelDesc" id="slotsDesc">Escolha onde salvar a campanha.</p>
+      <div id="slotsLista" class="slotsLista"></div>
+      <button id="btnSlotsVoltar" class="btn" data-voltar>VOLTAR</button>
+    </div>
+  </section>
+
+  <section id="confirma" class="tela" role="alertdialog" aria-labelledby="confirmaTitulo" hidden>
+    <div class="cartao pequeno">
+      <div class="faixaPerigo vermelha" aria-hidden="true"></div>
+      <h2 id="confirmaTitulo">SOBRESCREVER SAVE?</h2>
+      <p id="confirmaTxt" class="nivelDesc"></p>
+      <div class="colunaBtn">
+        <button id="btnConfirmaNao" class="btn primario" data-voltar>NÃO, CANCELAR</button>
+        <button id="btnConfirmaSim" class="btn">SIM, SOBRESCREVER</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Conquistas · Recompensas · Habilidades -->
+  <section id="painelMeta" class="tela" role="dialog" aria-labelledby="metaTitulo" hidden>
+    <div class="cartao metaCartao">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <h2 id="metaTitulo">ARQUIVO DO SOLDADO</h2>
+      <div class="abas" role="tablist">
+        <button class="btn aba" data-aba="conq" role="tab">CONQUISTAS</button>
+        <button class="btn aba" data-aba="recomp" role="tab">RECOMPENSAS</button>
+        <button class="btn aba" data-aba="hab" role="tab">HABILIDADES</button>
+      </div>
+      <p id="metaResumo" class="metaResumo"></p>
+      <div id="metaLista" class="metaLista"></div>
+      <button id="btnMetaVoltar" class="btn primario" data-voltar>VOLTAR</button>
+    </div>
+  </section>
+
+  <!-- Legado: conquistas permanentes + árvore de metaprogressão (PC) -->
+  <section id="painelLegado" class="tela" role="dialog" aria-labelledby="legTitulo" hidden>
+    <div class="cartao metaCartao legCartao">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <h2 id="legTitulo">LEGADO DO SOLDADO</h2>
+      <div class="legPC"><span class="rotulo">PONTOS DE RECOMPENSA</span><b id="legPC">0</b><small>LB / RB trocam de aba</small></div>
+      <div class="abas" role="tablist">
+        <button class="btn aba" data-leg="conq" role="tab">CONQUISTAS</button>
+        <button class="btn aba" data-leg="arv" role="tab">ÁRVORE</button>
+      </div>
+      <div id="legLista" class="metaLista legLista"></div>
+      <button id="btnLegVoltar" class="btn primario" data-voltar>VOLTAR</button>
+    </div>
+  </section>
+
+  <!-- Intro cinematográfica (4 telas) · isolada da HUD; controlada por intro.js -->
+  <section id="intro" class="intro" role="dialog" aria-label="Introdução" hidden>
+    <div class="introCena" id="introCena" aria-live="polite">
+      <p class="introAno" id="introAno"></p>
+      <h2 id="introTitulo"></h2>
+      <p class="introTexto" id="introTexto"></p>
+    </div>
+    <div class="introRodape">
+      <div class="introPassos" id="introPassos" aria-hidden="true"></div>
+      <div class="introBarra" aria-hidden="true"><i id="introBarra"></i></div>
+      <div class="introBotoes">
+        <button type="button" id="btnIntroPular" class="btn">PULAR INTRO</button>
+        <button type="button" id="btnIntroAvancar" class="btn primario">AVANÇAR ▸</button>
+      </div>
+      <small id="introDica"></small>
+    </div>
+  </section>
+
+  <!-- Escolha de perk ao subir de nível (congela o jogo) -->
+  <section id="perks" class="tela perkTela" role="dialog" aria-label="Nova melhoria" hidden>
+    <div id="perksGrade" class="perkCartao"></div>
+  </section>
+
+  <!-- Créditos -->
+  <section id="creditos" class="tela" role="dialog" aria-labelledby="creditosTitulo" hidden>
+    <div class="cartao pequeno">
+      <div class="faixaPerigo" aria-hidden="true"></div>
+      <p class="selo">EQUIPE DA OPERAÇÃO</p>
+      <h2 id="creditosTitulo">CRÉDITOS</h2>
+      <ul class="credLista" id="credLista"></ul>
+      <button id="btnCreditosVoltar" class="btn primario" data-voltar>VOLTAR</button>
+    </div>
+  </section>
+
+  <!-- Loja de armas -->
+  <section id="loja" class="tela lojaTela" role="dialog" aria-labelledby="lojaTitulo" hidden>
+    <div class="lojaPainel">
+      <header class="lojaTopo">
+        <div><p class="selo">INTENDÊNCIA DE CAMPO</p><h2 id="lojaTitulo">ARMARIA</h2></div>
+        <div class="lojaPts"><span class="rotulo">PONTOS</span><b id="lojaPontos">0</b></div>
+        <button id="btnLojaFechar" class="btn">FECHAR</button>
+      </header>
+      <div id="lojaGrade" class="lojaGrade"></div>
+      <footer class="lojaRodape"><span id="lojaMsg" class="lojaMsg"></span><span id="lojaDica" class="lojaDica"></span></footer>
+    </div>
+  </section>
+
+  <!-- Fim de jogo -->
+  <section id="fim" class="tela" role="dialog" aria-labelledby="fimTitulo" hidden>
+    <div class="cartao">
+      <div class="faixaPerigo vermelha" aria-hidden="true"></div>
+      <p class="selo vermelho">BAIXA CONFIRMADA</p>
+      <h2 id="fimTitulo">SOLDADO ABATIDO NA RODADA <b id="fimRodada">1</b></h2>
+      <p id="fimNivel" class="selo">NORMAL · SOLDADO</p>
+      <dl class="stats">
+        <div><dt>Pontos</dt><dd id="fimPontos">0</dd></div>
+        <div><dt>Abatidos</dt><dd id="fimAbates">0</dd></div>
+        <div><dt>Tempo</dt><dd id="fimTempo">0:00</dd></div>
+      </dl>
+      <p id="fimRecorde" class="recordeMsg"></p>
+      <div class="acoesMenu">
+        <button id="btnFimCarregar" class="btn primario" hidden>CONTINUAR DO ÚLTIMO SAVE</button>
+        <button id="btnDeNovo" class="btn primario">NOVA OPERAÇÃO</button>
+        <button id="btnMenu2" class="btn" data-voltar>MENU</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="erro" class="tela" hidden><div class="cartao pequeno"><h2>FALHA NO SISTEMA</h2><p id="erroTxt"></p></div></div>
+</div>
+
+<script src="sim-js.js"></script>
+<script src="sim-wasm.js"></script>
+<script src="audio.js"></script>
+<script src="sprites.js"></script>
+<script src="gore.js"></script>
+<script src="gamepad.js"></script>
+<script src="meta.js"></script>
+<script src="legado.js"></script>
+<script src="intro.js"></script>
+<script src="creditos.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
